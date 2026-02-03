@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OCR Scanner - Mobile</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 16px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            padding: 20px 0;
+        }
+
+        header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 8px;
+        }
+
+        header p {
+            opacity: 0.9;
+            font-size: 0.95rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .upload-area {
+            border: 2px dashed #ddd;
+            border-radius: 12px;
+            padding: 30px 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-area:hover,
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .upload-area svg {
+            width: 48px;
+            height: 48px;
+            color: #667eea;
+            margin-bottom: 12px;
+        }
+
+        .upload-area h3 {
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 1.1rem;
+        }
+
+        .upload-area p {
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .input-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 14px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        #fileInput,
+        #cameraInput {
+            display: none;
+        }
+
+        .preview-section {
+            display: none;
+        }
+
+        .preview-section.active {
+            display: block;
+        }
+
+        .preview-container {
+            position: relative;
+            width: 100%;
+            margin-bottom: 16px;
+        }
+
+        #preview {
+            width: 100%;
+            border-radius: 12px;
+            display: block;
+        }
+
+        .clear-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .progress-section {
+            display: none;
+        }
+
+        .progress-section.active {
+            display: block;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .result-section {
+            display: none;
+        }
+
+        .result-section.active {
+            display: block;
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .result-header h3 {
+            color: #333;
+            font-size: 1.1rem;
+        }
+
+        .copy-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .copy-btn:hover {
+            background: #5a6fd6;
+        }
+
+        .copy-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        #resultText {
+            width: 100%;
+            min-height: 150px;
+            padding: 16px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            font-size: 1rem;
+            line-height: 1.6;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        #resultText:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .language-select {
+            margin-bottom: 16px;
+        }
+
+        .language-select label {
+            display: block;
+            color: #555;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+        }
+
+        .language-select select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            font-size: 1rem;
+            background: white;
+            cursor: pointer;
+        }
+
+        .language-select select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: #333;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c00;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 12px;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .error-message.active {
+            display: block;
+        }
+
+        @media (max-width: 400px) {
+            .input-buttons {
+                flex-direction: column;
+            }
+
+            header h1 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>OCR Scanner</h1>
+            <p>Extract text from images instantly</p>
+        </header>
+
+        <div class="card">
+            <div class="language-select">
+                <label for="language">Recognition Language</label>
+                <select id="language">
+                    <option value="eng">English</option>
+                    <option value="chi_sim">Chinese (Simplified)</option>
+                    <option value="chi_tra">Chinese (Traditional)</option>
+                    <option value="jpn">Japanese</option>
+                    <option value="kor">Korean</option>
+                    <option value="spa">Spanish</option>
+                    <option value="fra">French</option>
+                    <option value="deu">German</option>
+                    <option value="por">Portuguese</option>
+                    <option value="rus">Russian</option>
+                    <option value="ara">Arabic</option>
+                    <option value="hin">Hindi</option>
+                </select>
+            </div>
+
+            <div class="upload-area" id="uploadArea">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <h3>Tap to select an image</h3>
+                <p>or drag and drop here</p>
+            </div>
+
+            <div class="input-buttons">
+                <button class="btn btn-primary" id="cameraBtn">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Camera
+                </button>
+                <button class="btn btn-secondary" id="uploadBtn">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    Upload
+                </button>
+            </div>
+
+            <input type="file" id="fileInput" accept="image/*">
+            <input type="file" id="cameraInput" accept="image/*" capture="environment">
+
+            <div class="preview-section" id="previewSection">
+                <div class="preview-container">
+                    <img id="preview" alt="Preview">
+                    <button class="clear-btn" id="clearBtn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <button class="btn btn-primary" id="extractBtn" style="width: 100%;">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Extract Text
+                </button>
+            </div>
+
+            <div class="progress-section" id="progressSection">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <p class="progress-text" id="progressText">Initializing...</p>
+            </div>
+
+            <div class="error-message" id="errorMessage"></div>
+        </div>
+
+        <div class="card result-section" id="resultSection">
+            <div class="result-header">
+                <h3>Extracted Text</h3>
+                <button class="copy-btn" id="copyBtn">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    Copy
+                </button>
+            </div>
+            <textarea id="resultText" placeholder="Extracted text will appear here..."></textarea>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <!-- Tesseract.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+    <script>
+        // DOM Elements
+        const uploadArea = document.getElementById('uploadArea');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const cameraBtn = document.getElementById('cameraBtn');
+        const fileInput = document.getElementById('fileInput');
+        const cameraInput = document.getElementById('cameraInput');
+        const preview = document.getElementById('preview');
+        const previewSection = document.getElementById('previewSection');
+        const clearBtn = document.getElementById('clearBtn');
+        const extractBtn = document.getElementById('extractBtn');
+        const progressSection = document.getElementById('progressSection');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const resultSection = document.getElementById('resultSection');
+        const resultText = document.getElementById('resultText');
+        const copyBtn = document.getElementById('copyBtn');
+        const toast = document.getElementById('toast');
+        const languageSelect = document.getElementById('language');
+        const errorMessage = document.getElementById('errorMessage');
+
+        let selectedImage = null;
+        let worker = null;
+
+        // Show toast notification
+        function showToast(message) {
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // Show error message
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.add('active');
+        }
+
+        // Hide error message
+        function hideError() {
+            errorMessage.classList.remove('active');
+        }
+
+        // Handle file selection
+        function handleFile(file) {
+            if (!file || !file.type.startsWith('image/')) {
+                showError('Please select a valid image file.');
+                return;
+            }
+
+            hideError();
+            selectedImage = file;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                preview.src = e.target.result;
+                previewSection.classList.add('active');
+                resultSection.classList.remove('active');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Clear selection
+        function clearSelection() {
+            selectedImage = null;
+            preview.src = '';
+            previewSection.classList.remove('active');
+            resultSection.classList.remove('active');
+            progressSection.classList.remove('active');
+            hideError();
+        }
+
+        // Extract text using Tesseract.js
+        async function extractText() {
+            if (!selectedImage) {
+                showError('Please select an image first.');
+                return;
+            }
+
+            hideError();
+            extractBtn.disabled = true;
+            progressSection.classList.add('active');
+            progressFill.style.width = '0%';
+            progressText.textContent = 'Initializing OCR engine...';
+
+            try {
+                const language = languageSelect.value;
+
+                const result = await Tesseract.recognize(
+                    selectedImage,
+                    language,
+                    {
+                        logger: (m) => {
+                            if (m.status === 'recognizing text') {
+                                const progress = Math.round(m.progress * 100);
+                                progressFill.style.width = `${progress}%`;
+                                progressText.textContent = `Recognizing text... ${progress}%`;
+                            } else if (m.status === 'loading language traineddata') {
+                                progressText.textContent = 'Loading language data...';
+                                progressFill.style.width = '10%';
+                            } else if (m.status === 'initializing api') {
+                                progressText.textContent = 'Initializing...';
+                                progressFill.style.width = '5%';
+                            }
+                        }
+                    }
+                );
+
+                progressFill.style.width = '100%';
+                progressText.textContent = 'Complete!';
+
+                setTimeout(() => {
+                    progressSection.classList.remove('active');
+                    resultSection.classList.add('active');
+                    resultText.value = result.data.text.trim() || 'No text detected in the image.';
+                }, 500);
+
+            } catch (error) {
+                console.error('OCR Error:', error);
+                progressSection.classList.remove('active');
+                showError('Failed to process image. Please try again.');
+            } finally {
+                extractBtn.disabled = false;
+            }
+        }
+
+        // Copy text to clipboard
+        async function copyToClipboard() {
+            try {
+                await navigator.clipboard.writeText(resultText.value);
+                showToast('Text copied to clipboard!');
+            } catch (err) {
+                // Fallback for older browsers
+                resultText.select();
+                document.execCommand('copy');
+                showToast('Text copied to clipboard!');
+            }
+        }
+
+        // Event Listeners
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadBtn.addEventListener('click', () => fileInput.click());
+        cameraBtn.addEventListener('click', () => cameraInput.click());
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) handleFile(e.target.files[0]);
+        });
+
+        cameraInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) handleFile(e.target.files[0]);
+        });
+
+        clearBtn.addEventListener('click', clearSelection);
+        extractBtn.addEventListener('click', extractText);
+        copyBtn.addEventListener('click', copyToClipboard);
+
+        // Drag and drop support
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+        });
+
+        // Prevent zoom on double tap for iOS
+        document.addEventListener('touchend', (e) => {
+            const now = Date.now();
+            if (now - (document.lastTouchEnd || 0) <= 300) {
+                e.preventDefault();
+            }
+            document.lastTouchEnd = now;
+        }, false);
+    </script>
+</body>
+</html>
