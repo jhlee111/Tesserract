@@ -120,6 +120,12 @@
             background: #e0e0e0;
         }
 
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            flex: none;
+        }
+
         .btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
@@ -170,6 +176,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            z-index: 10;
         }
 
         .progress-section {
@@ -246,7 +253,7 @@
 
         #resultText {
             width: 100%;
-            min-height: 150px;
+            min-height: 120px;
             padding: 16px;
             border: 1px solid #ddd;
             border-radius: 10px;
@@ -319,6 +326,162 @@
             display: block;
         }
 
+        /* OCR Canvas Overlay Styles */
+        .ocr-canvas-container {
+            position: relative;
+            width: 100%;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .ocr-canvas-container.active {
+            display: block;
+        }
+
+        .ocr-canvas-container img {
+            width: 100%;
+            border-radius: 12px;
+            display: block;
+        }
+
+        #ocrCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+
+        /* Filename Builder Styles */
+        .filename-section {
+            display: none;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #eee;
+        }
+
+        .filename-section.active {
+            display: block;
+        }
+
+        .filename-section h4 {
+            color: #333;
+            font-size: 1rem;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filename-section h4 svg {
+            width: 18px;
+            height: 18px;
+            color: #667eea;
+        }
+
+        .filename-hint {
+            color: #888;
+            font-size: 0.85rem;
+            margin-bottom: 12px;
+        }
+
+        .filename-preview {
+            background: #f8f9ff;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            padding: 14px 16px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.95rem;
+            color: #333;
+            word-break: break-all;
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+        }
+
+        .filename-preview.empty {
+            color: #aaa;
+            font-style: italic;
+            font-family: inherit;
+        }
+
+        .filename-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .selected-words {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .selected-word-tag {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            animation: popIn 0.2s ease;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .selected-word-tag .order {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+
+        .selected-word-tag .remove {
+            cursor: pointer;
+            opacity: 0.8;
+            margin-left: 4px;
+        }
+
+        .selected-word-tag .remove:hover {
+            opacity: 1;
+        }
+
+        .instruction-banner {
+            background: linear-gradient(135deg, #667eea22 0%, #764ba222 100%);
+            border: 1px solid #667eea44;
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .instruction-banner.active {
+            display: block;
+        }
+
+        .instruction-banner p {
+            color: #555;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .instruction-banner strong {
+            color: #667eea;
+        }
+
         @media (max-width: 400px) {
             .input-buttons {
                 flex-direction: column;
@@ -327,6 +490,10 @@
             header h1 {
                 font-size: 1.5rem;
             }
+
+            .filename-actions {
+                flex-direction: column;
+            }
         }
     </style>
 </head>
@@ -334,7 +501,7 @@
     <div class="container">
         <header>
             <h1>OCR Scanner</h1>
-            <p>Extract text from images instantly</p>
+            <p>Extract text & build filenames</p>
         </header>
 
         <div class="card">
@@ -410,17 +577,64 @@
             <div class="error-message" id="errorMessage"></div>
         </div>
 
+        <!-- OCR Result with Interactive Bounding Boxes -->
         <div class="card result-section" id="resultSection">
-            <div class="result-header">
-                <h3>Extracted Text</h3>
-                <button class="copy-btn" id="copyBtn">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            <div class="instruction-banner active" id="instructionBanner">
+                <p><strong>Tap words</strong> in the image below to select them in order. Selected words will be combined with underscores to create a filename.</p>
+            </div>
+
+            <div class="ocr-canvas-container active" id="canvasContainer">
+                <img id="resultImage" alt="OCR Result">
+                <canvas id="ocrCanvas"></canvas>
+                <button class="clear-btn" id="clearSelectionBtn" title="Clear selections">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
-                    Copy
                 </button>
             </div>
-            <textarea id="resultText" placeholder="Extracted text will appear here..."></textarea>
+
+            <!-- Filename Builder -->
+            <div class="filename-section active" id="filenameSection">
+                <h4>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    Filename Builder
+                </h4>
+                <p class="filename-hint">Selected words appear below. Tap a word in the image to add/remove it.</p>
+
+                <div class="selected-words" id="selectedWords"></div>
+
+                <div class="filename-preview empty" id="filenamePreview">
+                    No words selected yet
+                </div>
+
+                <div class="filename-actions">
+                    <button class="btn btn-primary btn-small" id="copyFilenameBtn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        Copy Filename
+                    </button>
+                    <button class="btn btn-secondary btn-small" id="clearFilenameBtn">
+                        Clear All
+                    </button>
+                </div>
+            </div>
+
+            <!-- Full Text Result -->
+            <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid #eee;">
+                <div class="result-header">
+                    <h3>Full Extracted Text</h3>
+                    <button class="copy-btn" id="copyBtn">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        Copy
+                    </button>
+                </div>
+                <textarea id="resultText" placeholder="Extracted text will appear here..."></textarea>
+            </div>
         </div>
     </div>
 
@@ -450,8 +664,25 @@
         const languageSelect = document.getElementById('language');
         const errorMessage = document.getElementById('errorMessage');
 
+        // Canvas elements
+        const canvasContainer = document.getElementById('canvasContainer');
+        const resultImage = document.getElementById('resultImage');
+        const ocrCanvas = document.getElementById('ocrCanvas');
+        const ctx = ocrCanvas.getContext('2d');
+
+        // Filename builder elements
+        const filenameSection = document.getElementById('filenameSection');
+        const selectedWordsContainer = document.getElementById('selectedWords');
+        const filenamePreview = document.getElementById('filenamePreview');
+        const copyFilenameBtn = document.getElementById('copyFilenameBtn');
+        const clearFilenameBtn = document.getElementById('clearFilenameBtn');
+        const clearSelectionBtn = document.getElementById('clearSelectionBtn');
+
         let selectedImage = null;
-        let worker = null;
+        let ocrWords = [];
+        let selectedWords = []; // Array of {word, index, order}
+        let imageScale = 1;
+        let imageOffset = { x: 0, y: 0 };
 
         // Show toast notification
         function showToast(message) {
@@ -486,6 +717,10 @@
                 preview.src = e.target.result;
                 previewSection.classList.add('active');
                 resultSection.classList.remove('active');
+                // Reset state
+                ocrWords = [];
+                selectedWords = [];
+                updateFilenameDisplay();
             };
             reader.readAsDataURL(file);
         }
@@ -498,6 +733,9 @@
             resultSection.classList.remove('active');
             progressSection.classList.remove('active');
             hideError();
+            ocrWords = [];
+            selectedWords = [];
+            updateFilenameDisplay();
         }
 
         // Extract text using Tesseract.js
@@ -539,10 +777,16 @@
                 progressFill.style.width = '100%';
                 progressText.textContent = 'Complete!';
 
+                // Store words with bounding boxes
+                ocrWords = result.data.words.filter(w => w.text.trim().length > 0);
+
                 setTimeout(() => {
                     progressSection.classList.remove('active');
                     resultSection.classList.add('active');
                     resultText.value = result.data.text.trim() || 'No text detected in the image.';
+
+                    // Setup canvas with image and bounding boxes
+                    setupCanvas();
                 }, 500);
 
             } catch (error) {
@@ -554,13 +798,197 @@
             }
         }
 
-        // Copy text to clipboard
+        // Setup canvas overlay
+        function setupCanvas() {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                resultImage.src = e.target.result;
+                resultImage.onload = () => {
+                    // Calculate scale factor
+                    const containerWidth = canvasContainer.clientWidth;
+                    const imgWidth = resultImage.naturalWidth;
+                    const imgHeight = resultImage.naturalHeight;
+
+                    imageScale = containerWidth / imgWidth;
+
+                    // Set canvas size to match displayed image
+                    ocrCanvas.width = containerWidth;
+                    ocrCanvas.height = imgHeight * imageScale;
+
+                    drawBoundingBoxes();
+                };
+            };
+            reader.readAsDataURL(selectedImage);
+        }
+
+        // Draw bounding boxes on canvas
+        function drawBoundingBoxes() {
+            ctx.clearRect(0, 0, ocrCanvas.width, ocrCanvas.height);
+
+            ocrWords.forEach((word, index) => {
+                const bbox = word.bbox;
+                const x = bbox.x0 * imageScale;
+                const y = bbox.y0 * imageScale;
+                const width = (bbox.x1 - bbox.x0) * imageScale;
+                const height = (bbox.y1 - bbox.y0) * imageScale;
+
+                const isSelected = selectedWords.find(sw => sw.index === index);
+
+                if (isSelected) {
+                    // Selected style - filled with gradient
+                    ctx.fillStyle = 'rgba(102, 126, 234, 0.3)';
+                    ctx.fillRect(x, y, width, height);
+                    ctx.strokeStyle = '#667eea';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x, y, width, height);
+
+                    // Draw order number
+                    const orderNum = isSelected.order;
+                    const circleRadius = 12;
+                    const circleX = x + width - circleRadius + 4;
+                    const circleY = y - circleRadius + 4;
+
+                    ctx.beginPath();
+                    ctx.arc(circleX, circleY, circleRadius, 0, Math.PI * 2);
+                    ctx.fillStyle = '#667eea';
+                    ctx.fill();
+
+                    ctx.fillStyle = 'white';
+                    ctx.font = 'bold 11px -apple-system, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(orderNum.toString(), circleX, circleY);
+                } else {
+                    // Unselected style - subtle outline
+                    ctx.strokeStyle = 'rgba(102, 126, 234, 0.5)';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([3, 3]);
+                    ctx.strokeRect(x, y, width, height);
+                    ctx.setLineDash([]);
+                }
+            });
+        }
+
+        // Handle canvas click
+        function handleCanvasClick(e) {
+            const rect = ocrCanvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            // Find clicked word
+            for (let i = 0; i < ocrWords.length; i++) {
+                const word = ocrWords[i];
+                const bbox = word.bbox;
+                const x = bbox.x0 * imageScale;
+                const y = bbox.y0 * imageScale;
+                const width = (bbox.x1 - bbox.x0) * imageScale;
+                const height = (bbox.y1 - bbox.y0) * imageScale;
+
+                if (clickX >= x && clickX <= x + width && clickY >= y && clickY <= y + height) {
+                    toggleWordSelection(i);
+                    break;
+                }
+            }
+        }
+
+        // Toggle word selection
+        function toggleWordSelection(index) {
+            const existingIndex = selectedWords.findIndex(sw => sw.index === index);
+
+            if (existingIndex !== -1) {
+                // Remove word
+                selectedWords.splice(existingIndex, 1);
+                // Reorder remaining words
+                selectedWords.forEach((sw, i) => sw.order = i + 1);
+            } else {
+                // Add word
+                const word = ocrWords[index];
+                selectedWords.push({
+                    word: word.text.trim(),
+                    index: index,
+                    order: selectedWords.length + 1
+                });
+            }
+
+            drawBoundingBoxes();
+            updateFilenameDisplay();
+        }
+
+        // Remove word by order
+        function removeWordByOrder(order) {
+            const idx = selectedWords.findIndex(sw => sw.order === order);
+            if (idx !== -1) {
+                selectedWords.splice(idx, 1);
+                // Reorder
+                selectedWords.forEach((sw, i) => sw.order = i + 1);
+                drawBoundingBoxes();
+                updateFilenameDisplay();
+            }
+        }
+
+        // Update filename display
+        function updateFilenameDisplay() {
+            // Update selected words tags
+            selectedWordsContainer.innerHTML = '';
+
+            selectedWords.forEach(sw => {
+                const tag = document.createElement('div');
+                tag.className = 'selected-word-tag';
+                tag.innerHTML = `
+                    <span class="order">${sw.order}</span>
+                    <span>${sw.word}</span>
+                    <span class="remove" onclick="removeWordByOrder(${sw.order})">×</span>
+                `;
+                selectedWordsContainer.appendChild(tag);
+            });
+
+            // Update filename preview
+            if (selectedWords.length === 0) {
+                filenamePreview.textContent = 'No words selected yet';
+                filenamePreview.classList.add('empty');
+            } else {
+                const filename = selectedWords
+                    .map(sw => sw.word.replace(/[^a-zA-Z0-9]/g, ''))
+                    .filter(w => w.length > 0)
+                    .join('_');
+                filenamePreview.textContent = filename || 'Invalid characters only';
+                filenamePreview.classList.remove('empty');
+            }
+        }
+
+        // Clear all selected words
+        function clearAllSelections() {
+            selectedWords = [];
+            drawBoundingBoxes();
+            updateFilenameDisplay();
+        }
+
+        // Copy filename to clipboard
+        async function copyFilename() {
+            if (selectedWords.length === 0) {
+                showToast('No words selected!');
+                return;
+            }
+
+            const filename = selectedWords
+                .map(sw => sw.word.replace(/[^a-zA-Z0-9]/g, ''))
+                .filter(w => w.length > 0)
+                .join('_');
+
+            try {
+                await navigator.clipboard.writeText(filename);
+                showToast('Filename copied!');
+            } catch (err) {
+                showToast('Failed to copy');
+            }
+        }
+
+        // Copy full text to clipboard
         async function copyToClipboard() {
             try {
                 await navigator.clipboard.writeText(resultText.value);
                 showToast('Text copied to clipboard!');
             } catch (err) {
-                // Fallback for older browsers
                 resultText.select();
                 document.execCommand('copy');
                 showToast('Text copied to clipboard!');
@@ -584,6 +1012,35 @@
         extractBtn.addEventListener('click', extractText);
         copyBtn.addEventListener('click', copyToClipboard);
 
+        // Canvas click handler
+        ocrCanvas.addEventListener('click', handleCanvasClick);
+        ocrCanvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            const touch = e.changedTouches[0];
+            const rect = ocrCanvas.getBoundingClientRect();
+            const clickX = touch.clientX - rect.left;
+            const clickY = touch.clientY - rect.top;
+
+            for (let i = 0; i < ocrWords.length; i++) {
+                const word = ocrWords[i];
+                const bbox = word.bbox;
+                const x = bbox.x0 * imageScale;
+                const y = bbox.y0 * imageScale;
+                const width = (bbox.x1 - bbox.x0) * imageScale;
+                const height = (bbox.y1 - bbox.y0) * imageScale;
+
+                if (clickX >= x && clickX <= x + width && clickY >= y && clickY <= y + height) {
+                    toggleWordSelection(i);
+                    break;
+                }
+            }
+        });
+
+        // Filename builder buttons
+        copyFilenameBtn.addEventListener('click', copyFilename);
+        clearFilenameBtn.addEventListener('click', clearAllSelections);
+        clearSelectionBtn.addEventListener('click', clearAllSelections);
+
         // Drag and drop support
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -598,6 +1055,20 @@
             e.preventDefault();
             uploadArea.classList.remove('dragover');
             if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (ocrWords.length > 0 && resultImage.src) {
+                const containerWidth = canvasContainer.clientWidth;
+                const imgWidth = resultImage.naturalWidth;
+                const imgHeight = resultImage.naturalHeight;
+
+                imageScale = containerWidth / imgWidth;
+                ocrCanvas.width = containerWidth;
+                ocrCanvas.height = imgHeight * imageScale;
+                drawBoundingBoxes();
+            }
         });
 
         // Prevent zoom on double tap for iOS
