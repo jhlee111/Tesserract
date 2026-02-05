@@ -411,6 +411,71 @@
             opacity: 1;
         }
 
+        /* Preprocessing Options Styles */
+        .preprocess-section {
+            margin-top: 16px;
+            padding: 12px;
+            background: #f8f9ff;
+            border-radius: 10px;
+            border: 1px solid #e0e4f0;
+        }
+
+        .preprocess-section h4 {
+            color: #555;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .preprocess-section h4 svg {
+            width: 16px;
+            height: 16px;
+            color: #667eea;
+        }
+
+        .preprocess-toggles {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .preprocess-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            color: #555;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .preprocess-toggle:hover {
+            border-color: #667eea;
+        }
+
+        .preprocess-toggle.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
+        }
+
+        .preprocess-toggle input {
+            display: none;
+        }
+
+        .preprocess-hint {
+            font-size: 0.75rem;
+            color: #888;
+            margin-top: 8px;
+        }
+
         /* Filename Builder Styles */
         .filename-section {
             display: none;
@@ -616,7 +681,36 @@
                         </svg>
                     </button>
                 </div>
-                <button class="btn btn-primary" id="extractBtn" style="width: 100%;">
+
+                <div class="preprocess-section">
+                    <h4>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                        </svg>
+                        Image Preprocessing
+                    </h4>
+                    <div class="preprocess-toggles">
+                        <label class="preprocess-toggle" id="toggleGrayscale">
+                            <input type="checkbox" id="optGrayscale">
+                            Grayscale
+                        </label>
+                        <label class="preprocess-toggle" id="toggleContrast">
+                            <input type="checkbox" id="optContrast">
+                            High Contrast
+                        </label>
+                        <label class="preprocess-toggle" id="toggleBinarize">
+                            <input type="checkbox" id="optBinarize">
+                            Binarize
+                        </label>
+                        <label class="preprocess-toggle" id="toggleInvert">
+                            <input type="checkbox" id="optInvert">
+                            Invert
+                        </label>
+                    </div>
+                    <p class="preprocess-hint">Enable for low-quality or difficult images. Grayscale often helps.</p>
+                </div>
+
+                <button class="btn btn-primary" id="extractBtn" style="width: 100%; margin-top: 12px;">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
@@ -743,6 +837,16 @@
         // Filename builder elements
         const filenameSection = document.getElementById('filenameSection');
         const selectedWordsContainer = document.getElementById('selectedWords');
+
+        // Preprocessing elements
+        const toggleGrayscale = document.getElementById('toggleGrayscale');
+        const toggleContrast = document.getElementById('toggleContrast');
+        const toggleBinarize = document.getElementById('toggleBinarize');
+        const toggleInvert = document.getElementById('toggleInvert');
+        const optGrayscale = document.getElementById('optGrayscale');
+        const optContrast = document.getElementById('optContrast');
+        const optBinarize = document.getElementById('optBinarize');
+        const optInvert = document.getElementById('optInvert');
         const filenamePreview = document.getElementById('filenamePreview');
         const copyFilenameBtn = document.getElementById('copyFilenameBtn');
         const clearFilenameBtn = document.getElementById('clearFilenameBtn');
@@ -770,6 +874,107 @@
             lastTouchTime: 0,
             touchStartPos: null
         };
+
+        // Preprocessing toggle handlers
+        function setupPreprocessToggles() {
+            const toggles = [
+                { toggle: toggleGrayscale, checkbox: optGrayscale },
+                { toggle: toggleContrast, checkbox: optContrast },
+                { toggle: toggleBinarize, checkbox: optBinarize },
+                { toggle: toggleInvert, checkbox: optInvert }
+            ];
+
+            toggles.forEach(({ toggle, checkbox }) => {
+                toggle.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    checkbox.checked = !checkbox.checked;
+                    toggle.classList.toggle('active', checkbox.checked);
+                });
+            });
+        }
+
+        // Image preprocessing functions
+        function preprocessImage(file) {
+            return new Promise((resolve) => {
+                const useGrayscale = optGrayscale.checked;
+                const useContrast = optContrast.checked;
+                const useBinarize = optBinarize.checked;
+                const useInvert = optInvert.checked;
+
+                // If no preprocessing, return original file
+                if (!useGrayscale && !useContrast && !useBinarize && !useInvert) {
+                    resolve(file);
+                    return;
+                }
+
+                const img = new Image();
+                const reader = new FileReader();
+
+                reader.onload = (e) => {
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+
+                        // Draw original image
+                        ctx.drawImage(img, 0, 0);
+
+                        // Get image data
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const data = imageData.data;
+
+                        // Apply preprocessing in order
+                        for (let i = 0; i < data.length; i += 4) {
+                            let r = data[i];
+                            let g = data[i + 1];
+                            let b = data[i + 2];
+
+                            // 1. Grayscale conversion
+                            if (useGrayscale || useBinarize) {
+                                const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                                r = g = b = gray;
+                            }
+
+                            // 2. Contrast enhancement (1.5x)
+                            if (useContrast) {
+                                const factor = 1.5;
+                                r = Math.min(255, Math.max(0, (r - 128) * factor + 128));
+                                g = Math.min(255, Math.max(0, (g - 128) * factor + 128));
+                                b = Math.min(255, Math.max(0, (b - 128) * factor + 128));
+                            }
+
+                            // 3. Binarization (threshold at 128)
+                            if (useBinarize) {
+                                const avg = (r + g + b) / 3;
+                                const binary = avg > 128 ? 255 : 0;
+                                r = g = b = binary;
+                            }
+
+                            // 4. Invert colors
+                            if (useInvert) {
+                                r = 255 - r;
+                                g = 255 - g;
+                                b = 255 - b;
+                            }
+
+                            data[i] = r;
+                            data[i + 1] = g;
+                            data[i + 2] = b;
+                        }
+
+                        ctx.putImageData(imageData, 0, 0);
+
+                        // Convert canvas to blob
+                        canvas.toBlob((blob) => {
+                            resolve(blob);
+                        }, 'image/png');
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
 
         // Show toast notification
         function showToast(message) {
@@ -837,13 +1042,17 @@
             extractBtn.disabled = true;
             progressSection.classList.add('active');
             progressFill.style.width = '0%';
-            progressText.textContent = 'Initializing OCR engine...';
+            progressText.textContent = 'Preprocessing image...';
 
             try {
+                // Apply preprocessing if any options selected
+                const processedImage = await preprocessImage(selectedImage);
+                progressText.textContent = 'Initializing OCR engine...';
+
                 const language = languageSelect.value;
 
                 const result = await Tesseract.recognize(
-                    selectedImage,
+                    processedImage,
                     language,
                     {
                         logger: (m) => {
@@ -953,12 +1162,12 @@
                     ctx.textBaseline = 'middle';
                     ctx.fillText(orderNum.toString(), circleX, circleY);
                 } else {
-                    // Unselected style - subtle outline
-                    ctx.strokeStyle = 'rgba(102, 126, 234, 0.5)';
+                    // Unselected style - light yellow fill with border
+                    ctx.fillStyle = 'rgba(255, 255, 150, 0.45)';
+                    ctx.fillRect(x, y, width, height);
+                    ctx.strokeStyle = 'rgba(200, 180, 50, 0.7)';
                     ctx.lineWidth = 1;
-                    ctx.setLineDash([3, 3]);
                     ctx.strokeRect(x, y, width, height);
-                    ctx.setLineDash([]);
                 }
             });
         }
@@ -1253,6 +1462,9 @@
                 showToast('Text copied to clipboard!');
             }
         }
+
+        // Initialize preprocessing toggles
+        setupPreprocessToggles();
 
         // Event Listeners
         uploadArea.addEventListener('click', () => fileInput.click());
