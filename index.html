@@ -1155,6 +1155,10 @@
                 const currentMidpoint = getMidpoint(e.touches[0], e.touches[1]);
                 const rect = canvasContainer.getBoundingClientRect();
 
+                // Guard against division by zero or invalid initial distance
+                if (!touchState.initialDistance || touchState.initialDistance <= 0) {
+                    return;
+                }
                 // Calculate new zoom
                 const scale = currentDistance / touchState.initialDistance;
                 const newZoom = Math.max(minZoom, Math.min(maxZoom, touchState.initialZoom * scale));
