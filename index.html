@@ -332,16 +332,27 @@
             width: 100%;
             margin-bottom: 16px;
             display: none;
+            overflow: hidden;
+            border-radius: 12px;
+            background: #f0f0f0;
+            touch-action: none;
         }
 
         .ocr-canvas-container.active {
             display: block;
         }
 
+        .ocr-canvas-wrapper {
+            position: relative;
+            transform-origin: 0 0;
+            will-change: transform;
+        }
+
         .ocr-canvas-container img {
             width: 100%;
-            border-radius: 12px;
+            border-radius: 0;
             display: block;
+            pointer-events: none;
         }
 
         #ocrCanvas {
@@ -350,8 +361,54 @@
             left: 0;
             width: 100%;
             height: 100%;
-            border-radius: 12px;
+            border-radius: 0;
             cursor: pointer;
+        }
+
+        .zoom-controls {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            display: flex;
+            gap: 4px;
+            z-index: 15;
+        }
+
+        .zoom-btn {
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .zoom-btn:hover {
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        .zoom-indicator {
+            position: absolute;
+            bottom: 8px;
+            left: 8px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 15;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .zoom-indicator.visible {
+            opacity: 1;
         }
 
         /* Filename Builder Styles */
@@ -580,17 +637,25 @@
         <!-- OCR Result with Interactive Bounding Boxes -->
         <div class="card result-section" id="resultSection">
             <div class="instruction-banner active" id="instructionBanner">
-                <p><strong>Tap words</strong> in the image below to select them in order. Selected words will be combined with underscores to create a filename.</p>
+                <p><strong>Tap words</strong> to select them. <strong>Pinch</strong> to zoom, <strong>two fingers</strong> to pan. Selected words become your filename.</p>
             </div>
 
             <div class="ocr-canvas-container active" id="canvasContainer">
-                <img id="resultImage" alt="OCR Result">
-                <canvas id="ocrCanvas"></canvas>
+                <div class="ocr-canvas-wrapper" id="canvasWrapper">
+                    <img id="resultImage" alt="OCR Result">
+                    <canvas id="ocrCanvas"></canvas>
+                </div>
                 <button class="clear-btn" id="clearSelectionBtn" title="Clear selections">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                 </button>
+                <div class="zoom-controls">
+                    <button class="zoom-btn" id="zoomOutBtn">−</button>
+                    <button class="zoom-btn" id="zoomResetBtn">⟲</button>
+                    <button class="zoom-btn" id="zoomInBtn">+</button>
+                </div>
+                <div class="zoom-indicator" id="zoomIndicator">100%</div>
             </div>
 
             <!-- Filename Builder -->
@@ -666,9 +731,14 @@
 
         // Canvas elements
         const canvasContainer = document.getElementById('canvasContainer');
+        const canvasWrapper = document.getElementById('canvasWrapper');
         const resultImage = document.getElementById('resultImage');
         const ocrCanvas = document.getElementById('ocrCanvas');
         const ctx = ocrCanvas.getContext('2d');
+        const zoomInBtn = document.getElementById('zoomInBtn');
+        const zoomOutBtn = document.getElementById('zoomOutBtn');
+        const zoomResetBtn = document.getElementById('zoomResetBtn');
+        const zoomIndicator = document.getElementById('zoomIndicator');
 
         // Filename builder elements
         const filenameSection = document.getElementById('filenameSection');
@@ -683,6 +753,23 @@
         let selectedWords = []; // Array of {word, index, order}
         let imageScale = 1;
         let imageOffset = { x: 0, y: 0 };
+
+        // Zoom and pan state
+        let viewZoom = 1;
+        let viewPan = { x: 0, y: 0 };
+        let minZoom = 1;
+        let maxZoom = 5;
+
+        // Touch gesture state
+        let touchState = {
+            isGesture: false,
+            initialDistance: 0,
+            initialZoom: 1,
+            initialPan: { x: 0, y: 0 },
+            initialMidpoint: { x: 0, y: 0 },
+            lastTouchTime: 0,
+            touchStartPos: null
+        };
 
         // Show toast notification
         function showToast(message) {
@@ -736,6 +823,7 @@
             ocrWords = [];
             selectedWords = [];
             updateFilenameDisplay();
+            resetZoom();
         }
 
         // Extract text using Tesseract.js
@@ -800,6 +888,9 @@
 
         // Setup canvas overlay
         function setupCanvas() {
+            // Reset zoom/pan for new image
+            resetZoom();
+
             const reader = new FileReader();
             reader.onload = (e) => {
                 resultImage.src = e.target.result;
@@ -814,6 +905,9 @@
                     // Set canvas size to match displayed image
                     ocrCanvas.width = containerWidth;
                     ocrCanvas.height = imgHeight * imageScale;
+
+                    // Set container height to match content
+                    canvasContainer.style.height = (imgHeight * imageScale) + 'px';
 
                     drawBoundingBoxes();
                 };
@@ -963,6 +1057,171 @@
             updateFilenameDisplay();
         }
 
+        // Zoom and Pan functions
+        function updateTransform() {
+            canvasWrapper.style.transform = `translate(${viewPan.x}px, ${viewPan.y}px) scale(${viewZoom})`;
+            showZoomIndicator();
+        }
+
+        function showZoomIndicator() {
+            zoomIndicator.textContent = `${Math.round(viewZoom * 100)}%`;
+            zoomIndicator.classList.add('visible');
+            clearTimeout(zoomIndicator.hideTimeout);
+            zoomIndicator.hideTimeout = setTimeout(() => {
+                zoomIndicator.classList.remove('visible');
+            }, 1500);
+        }
+
+        function constrainPan() {
+            const containerRect = canvasContainer.getBoundingClientRect();
+            const contentWidth = containerRect.width * viewZoom;
+            const contentHeight = (ocrCanvas.height / imageScale * imageScale) * viewZoom;
+
+            const minX = containerRect.width - contentWidth;
+            const minY = containerRect.height - contentHeight;
+
+            viewPan.x = Math.min(0, Math.max(minX, viewPan.x));
+            viewPan.y = Math.min(0, Math.max(minY, viewPan.y));
+
+            if (contentWidth <= containerRect.width) viewPan.x = 0;
+            if (contentHeight <= containerRect.height) viewPan.y = 0;
+        }
+
+        function zoomTo(newZoom, centerX, centerY) {
+            const oldZoom = viewZoom;
+            viewZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
+
+            if (centerX !== undefined && centerY !== undefined) {
+                // Zoom toward the center point
+                const zoomRatio = viewZoom / oldZoom;
+                viewPan.x = centerX - (centerX - viewPan.x) * zoomRatio;
+                viewPan.y = centerY - (centerY - viewPan.y) * zoomRatio;
+            }
+
+            constrainPan();
+            updateTransform();
+        }
+
+        function resetZoom() {
+            viewZoom = 1;
+            viewPan = { x: 0, y: 0 };
+            updateTransform();
+        }
+
+        function getDistance(touch1, touch2) {
+            const dx = touch2.clientX - touch1.clientX;
+            const dy = touch2.clientY - touch1.clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        function getMidpoint(touch1, touch2) {
+            return {
+                x: (touch1.clientX + touch2.clientX) / 2,
+                y: (touch1.clientY + touch2.clientY) / 2
+            };
+        }
+
+        function screenToCanvas(screenX, screenY) {
+            const rect = canvasContainer.getBoundingClientRect();
+            const x = (screenX - rect.left - viewPan.x) / viewZoom;
+            const y = (screenY - rect.top - viewPan.y) / viewZoom;
+            return { x, y };
+        }
+
+        // Touch handlers for pinch zoom and pan
+        function handleTouchStart(e) {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                touchState.isGesture = true;
+                touchState.initialDistance = getDistance(e.touches[0], e.touches[1]);
+                touchState.initialZoom = viewZoom;
+                touchState.initialPan = { ...viewPan };
+                touchState.initialMidpoint = getMidpoint(e.touches[0], e.touches[1]);
+            } else if (e.touches.length === 1) {
+                touchState.touchStartPos = {
+                    x: e.touches[0].clientX,
+                    y: e.touches[0].clientY,
+                    time: Date.now()
+                };
+                touchState.isGesture = false;
+            }
+        }
+
+        function handleTouchMove(e) {
+            if (e.touches.length === 2 && touchState.isGesture) {
+                e.preventDefault();
+
+                const currentDistance = getDistance(e.touches[0], e.touches[1]);
+                const currentMidpoint = getMidpoint(e.touches[0], e.touches[1]);
+                const rect = canvasContainer.getBoundingClientRect();
+
+                // Calculate new zoom
+                const scale = currentDistance / touchState.initialDistance;
+                const newZoom = Math.max(minZoom, Math.min(maxZoom, touchState.initialZoom * scale));
+
+                // Calculate pan (two-finger drag)
+                const midpointDelta = {
+                    x: currentMidpoint.x - touchState.initialMidpoint.x,
+                    y: currentMidpoint.y - touchState.initialMidpoint.y
+                };
+
+                // Apply zoom centered on midpoint
+                const zoomRatio = newZoom / touchState.initialZoom;
+                const midpointInContainer = {
+                    x: touchState.initialMidpoint.x - rect.left,
+                    y: touchState.initialMidpoint.y - rect.top
+                };
+
+                viewZoom = newZoom;
+                viewPan.x = midpointInContainer.x - (midpointInContainer.x - touchState.initialPan.x) * zoomRatio + midpointDelta.x;
+                viewPan.y = midpointInContainer.y - (midpointInContainer.y - touchState.initialPan.y) * zoomRatio + midpointDelta.y;
+
+                constrainPan();
+                updateTransform();
+            }
+        }
+
+        function handleTouchEnd(e) {
+            if (touchState.isGesture && e.touches.length < 2) {
+                touchState.isGesture = false;
+                return;
+            }
+
+            // Single tap detection for word selection
+            if (e.changedTouches.length === 1 && !touchState.isGesture && touchState.touchStartPos) {
+                const touch = e.changedTouches[0];
+                const dx = touch.clientX - touchState.touchStartPos.x;
+                const dy = touch.clientY - touchState.touchStartPos.y;
+                const dt = Date.now() - touchState.touchStartPos.time;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                // If it's a tap (small movement, quick touch)
+                if (distance < 10 && dt < 300) {
+                    e.preventDefault();
+                    const canvasPos = screenToCanvas(touch.clientX, touch.clientY);
+                    handleWordTap(canvasPos.x, canvasPos.y);
+                }
+            }
+
+            touchState.touchStartPos = null;
+        }
+
+        function handleWordTap(canvasX, canvasY) {
+            for (let i = 0; i < ocrWords.length; i++) {
+                const word = ocrWords[i];
+                const bbox = word.bbox;
+                const x = bbox.x0 * imageScale;
+                const y = bbox.y0 * imageScale;
+                const width = (bbox.x1 - bbox.x0) * imageScale;
+                const height = (bbox.y1 - bbox.y0) * imageScale;
+
+                if (canvasX >= x && canvasX <= x + width && canvasY >= y && canvasY <= y + height) {
+                    toggleWordSelection(i);
+                    break;
+                }
+            }
+        }
+
         // Copy filename to clipboard
         async function copyFilename() {
             if (selectedWords.length === 0) {
@@ -1012,29 +1271,44 @@
         extractBtn.addEventListener('click', extractText);
         copyBtn.addEventListener('click', copyToClipboard);
 
-        // Canvas click handler
-        ocrCanvas.addEventListener('click', handleCanvasClick);
-        ocrCanvas.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            const touch = e.changedTouches[0];
-            const rect = ocrCanvas.getBoundingClientRect();
-            const clickX = touch.clientX - rect.left;
-            const clickY = touch.clientY - rect.top;
-
-            for (let i = 0; i < ocrWords.length; i++) {
-                const word = ocrWords[i];
-                const bbox = word.bbox;
-                const x = bbox.x0 * imageScale;
-                const y = bbox.y0 * imageScale;
-                const width = (bbox.x1 - bbox.x0) * imageScale;
-                const height = (bbox.y1 - bbox.y0) * imageScale;
-
-                if (clickX >= x && clickX <= x + width && clickY >= y && clickY <= y + height) {
-                    toggleWordSelection(i);
-                    break;
-                }
-            }
+        // Canvas click handler (for desktop)
+        ocrCanvas.addEventListener('click', (e) => {
+            const canvasPos = screenToCanvas(e.clientX, e.clientY);
+            handleWordTap(canvasPos.x, canvasPos.y);
         });
+
+        // Touch handlers for pinch zoom, pan, and tap
+        canvasContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
+        canvasContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
+        canvasContainer.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+        // Zoom control buttons
+        zoomInBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const rect = canvasContainer.getBoundingClientRect();
+            zoomTo(viewZoom * 1.3, rect.width / 2, rect.height / 2);
+        });
+
+        zoomOutBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const rect = canvasContainer.getBoundingClientRect();
+            zoomTo(viewZoom / 1.3, rect.width / 2, rect.height / 2);
+        });
+
+        zoomResetBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            resetZoom();
+        });
+
+        // Mouse wheel zoom for desktop
+        canvasContainer.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const rect = canvasContainer.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            zoomTo(viewZoom * delta, mouseX, mouseY);
+        }, { passive: false });
 
         // Filename builder buttons
         copyFilenameBtn.addEventListener('click', copyFilename);
@@ -1067,18 +1341,11 @@
                 imageScale = containerWidth / imgWidth;
                 ocrCanvas.width = containerWidth;
                 ocrCanvas.height = imgHeight * imageScale;
+                canvasContainer.style.height = (imgHeight * imageScale) + 'px';
+                resetZoom();
                 drawBoundingBoxes();
             }
         });
-
-        // Prevent zoom on double tap for iOS
-        document.addEventListener('touchend', (e) => {
-            const now = Date.now();
-            if (now - (document.lastTouchEnd || 0) <= 300) {
-                e.preventDefault();
-            }
-            document.lastTouchEnd = now;
-        }, false);
     </script>
 </body>
 </html>
