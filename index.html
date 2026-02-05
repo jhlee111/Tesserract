@@ -1075,7 +1075,7 @@
         function constrainPan() {
             const containerRect = canvasContainer.getBoundingClientRect();
             const contentWidth = containerRect.width * viewZoom;
-            const contentHeight = (ocrCanvas.height / imageScale * imageScale) * viewZoom;
+            const contentHeight = ocrCanvas.height * viewZoom;
 
             const minX = containerRect.width - contentWidth;
             const minY = containerRect.height - contentHeight;
